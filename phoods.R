@@ -10,17 +10,18 @@ library(devtools)
 library(googleway)
 library(stringr)
 
+source("census_proj.R")
+
 register_google(key="AIzaSyBM0fQBiP-OVRxxtTJyM-_dNOBzstfzaxU")
 key <- "AIzaSyBM0fQBiP-OVRxxtTJyM-_dNOBzstfzaxU"
 
-phoods <- google_places(search_string = "Planned Parenthood",
-              location = c(44.182205, -84.506836),
-              radius = 5000,
+phoods <- google_places(search_string = "reproductive health clinic",
+              location = c(42.7325, -84.5555),
               key = key
               )
-
+#phoods
 #getting dataframe out of the returned list
-names(phoods)
+#names(phoods)
 
 results <- phoods$results
 is.data.frame(results)
@@ -35,10 +36,10 @@ library(maptools)
 
 #need the dataframe to have only latitude and longitude to pass into the function
 lat_and_long <- results$geometry$location
-View(lat_and_long)
+#View(lat_and_long)
 
 lat_and_long2 <- lat_and_long[,c(2,1)]
-View(lat_and_long2)
+#View(lat_and_long2)
 
 #function to convert to county
 latlong2county <- function(pointsDF) {
@@ -62,7 +63,7 @@ latlong2county <- function(pointsDF) {
 }
 
 counties <- latlong2county(lat_and_long2)
-View(counties) 
+#View(counties) 
 
 #in michigan exclusively
 counties_in_mi <- str_detect(counties, "michigan")
