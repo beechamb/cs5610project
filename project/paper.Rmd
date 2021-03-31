@@ -1,0 +1,15 @@
+---
+title: "Project"
+author: "Beth Chambers"
+date: "3/30/2021"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Reproductive Healthcare Biases within Michigan
+
+Introduction
+
