@@ -135,15 +135,6 @@ affluent_county_coordinates[102,8] = 41.9299
 affluent_county_coordinates[135,7] = -83.5070
 affluent_county_coordinates[135,8] = 41.9739
 
-county_coords[27,2] = -86.4997
-county_coords[27,3] 43.9665
-county_coords[15,2] = -88.4903
-county_coords[15,3] = 46.2758
-county_coords[56,2] = -86.9844
-county_coords[56,3] = 45.7124
-county_coords[56,2] = -87.8616
-county_coords[56,3] = 45.9601
-#some still have to be changed for county coords
 
 #getting map data for states and counties
 states <- map_data("state")
@@ -178,16 +169,16 @@ ggmap(map) +
   geom_point(data = clinics, mapping = aes(x=lon,y=lat,col="Clinic"), position = "jitter") +
   geom_point(data = affluent_county_coordinates, mapping = aes(x=lon,y=lat,col = "Loaded"), position = "jitter")
 
-#add column telling whether or not the county has a family planning clinic
-income_stats$repo.healthcare <- ifelse(income_stats$NAME %in% clinics$County, "yes", "no")
+#add column telling whether or not the county has a family planning clinic, where 1 = there is a clinic and 0 = no
+income_stats$repo.healthcare <- ifelse(income_stats$NAME %in% clinics$County, 1, 0)
 #View(income_stats)
 
-#column telling whether or not county is impoverished
-income_stats$in.poverty <- ifelse(income_stats$Income <= 26500, "yes", "no")
+#column telling whether or not county is impoverished, where 1 = impoverished and 0 = not impoverished
+income_stats$in.poverty <- ifelse(income_stats$Income <= 26500, 1, 0)
 #View(income_stats)
 
-#column telling whether or not county is rich af
-income_stats$is.affluent <- ifelse(income_stats$Income >= 60088, "yes", "no")
+#column telling whether or not county is rich af, where 1 = rich and 0 = not rich
+income_stats$is.affluent <- ifelse(income_stats$Income >= 60088, 1, 0)
 View(income_stats)
 
 #chi square test poverty
@@ -200,10 +191,18 @@ aff_table <- table(income_stats$is.affluent, income_stats$repo.healthcare)
 chisq.test(aff_table, correct = F)
 
 #correlation
-#cor(income_stats$repo.healthcare, income_stats$in.poverty)
+cor(income_stats$repo.healthcare, income_stats$in.poverty)
+cor(income_stats$repo.healthcare, income_stats$is.affluent)
 
 #clinics per loaded county vs clinics per poor county
-
-
+ok <- income_stats %>%
+  select(repo.healthcare, is.affluent, in.poverty) %>%
+  gather(key = repo.healthcare,
+         value = "yes") %>%
+  group_by(repo.healthcare) %>%
+  summarize(count = sum(yes==1))
+ggplot(ok,aes(x=repo.healthcare, y=count)) +
+  geom_bar(stat = "identity")
+View(ok)
 #logistic regression, week 11 cs5610
 #add number of clinics to counties dataframe
