@@ -41,6 +41,12 @@ pov_vars <- listCensusMetadata(
 )
 View(pov_vars)
 
+community <- listCensusMetadata(
+  name = "acs/acs1",
+  vintage = 2019)
+
+View(community)
+
 #listCensusMetadata(
 #  name = "timeseries/poverty/histpov2",
 #  type = "geography"
@@ -67,7 +73,14 @@ saipe_county <- getCensus(
            )
 View(saipe_county)
 
-
+incomes <- getCensus(
+  name = "acs/acs1",
+  vintage = 2019,
+  vars = c("NAME", "B19019_001E"),
+  region = "county",
+  regionin = "state:26"
+)
+View(incomes)
 #rename columns
 income_stats <- rename(saipe_county, Income = SAEMHI_UB90,
                        People.Count = SAEPOVALL_UB90) %>% drop_na()
@@ -79,7 +92,7 @@ affluent <- filter(income_stats, Income >= 60008)
 
 
 #families under the poverty threshold in michigan
-#<22,314 for a family of four in michigan
+#<26500for a family of four in michigan
 in_poverty <- filter(income_stats, Income  <= 26500)
 
 #taking counties in poverty and converting to latitude/longitude locations
@@ -88,16 +101,17 @@ poor_county_coordinates <- mutate_geocode(in_poverty, NAME)
 
 
 affluent_county_coordinates <- mutate_geocode(affluent, NAME)
-locations2 <- as_tibble(affluent_county_coordinates)
-locations_sf2 <- st_as_sf(locations2, coords = c ("lon","lat"), crs = 4326)
-mapview(locations_sf2)
+#locations2 <- as_tibble(affluent_county_coordinates)
+#locations_sf2 <- st_as_sf(locations2, coords = c ("lon","lat"), crs = 4326)
+#mapview(locations_sf2)
 
-locations <- as_tibble(county_coordinates)
-locations_sf <- st_as_sf(locations, coords = c("lon", "lat"), crs = 4326)
-mapview(locations_sf)
+#locations <- as_tibble(county_coordinates)
+#locations_sf <- st_as_sf(locations, coords = c("lon", "lat"), crs = 4326)
+#mapview(locations_sf)
 
 #counties with title x family planning clinics
 clinics <- read.csv("clinics.csv")
+clinics <- select(clinics, County, Address)
 View(clinics)
 
 #convert title x addresses to coordinates using google maps api
@@ -148,7 +162,7 @@ mi_base +
   geom_point(data = poor_county_coordinates, mapping = aes(x=lon, y=lat, col = "Poor"), inherit.aes = FALSE) +
   geom_point(data = affluent_county_coordinates, mapping = aes(x=lon, y=lat, col = "Loaded"), inherit.aes = FALSE) +
   geom_point(data = clinics, mapping = aes(x=lon, y=lat, col = "Clinic"), inherit.aes = FALSE) +
-  coord_cartesian(xlim = c(-90,-80)) +
+  coord_cartesian(xlim = c(-90,-80), ylim =c(40,50)) +
   labs(color = "Legend")
   
 
@@ -187,6 +201,8 @@ cor(income_stats$repo.healthcare, income_stats$Income)
 cor(income_stats$repo.healthcare, income_stats$in.poverty)
 cor(income_stats$repo.healthcare, income_stats$is.affluent)
 
+#correlation plot
+plot(cor(income_stats$repo.healthcare, income_stats$Income))
 #graph of clinics per affluent county vs clinics per impoverished county
 clinic_counts <- income_stats %>%
   select(repo.healthcare, is.affluent, in.poverty) %>%
@@ -197,15 +213,21 @@ clinic_counts <- income_stats %>%
 ggplot(clinic_counts,aes(x=repo.healthcare, y=count)) +
   geom_bar(stat = "identity")
 
-#graph of mean income for affluent counties and impoverished counties
-#which have a title x clinic
+#graph showing the median income per county, colored by whether or not there
+#is a family planning clinic
 income_medians <- income_stats %>%
-  select(repo.healthcare, is.affluent, in.poverty, Income) %>%
-  group_by(repo.healthcare) %>%
+  select(repo.healthcare, is.affluent, in.poverty, Income, NAME) %>%
+  group_by(NAME) %>%
   summarize(median_income = mean(Income))
 
-ggplot(data = income_medians) + 
-  geom_bar(mapping=aes(x=repo.healthcare, y=median_income))
+#adding a column for reproductive healthcare where 1 = presence of a clinic
+#and 0 = no clinic
+income_medians$repo.healthcare <- ifelse(income_medians$NAME %in% clinics$County, 1, 0)
+
+ggplot(income_medians, aes(x=NAME, y=median_income, color = as.factor(repo.healthcare))) +
+  geom_point()
   
-#logistic regression, week 11 cs5610
-#add number of clinics to counties dataframe
+
+#logistic regression
+logit <- glm(repo.healthcare ~ Income + People.Count, data = income_stats)
+summary(logit)
