@@ -13,10 +13,13 @@ library("ggmap")
 library("devtools")
 library("googleway")
 library("stringr")
+library("shiny")
+library("leaflet")
 
 #registering API keys and setting R environment
 #google maps
 source("keys.R")
+
 register_google(key=gkey)
 
 #census bureau
@@ -25,14 +28,14 @@ Sys.getenv("CENSUS_KEY")
 
 #viewing census APIs
 apis <- listCensusApis()
-View(apis)
+
 
 #selecting appropriate variables from the API
 variables <- listCensusMetadata(
-  name = "acs/acs1",
-  vintage = 2019
+  name = "timeseries/poverty/saipe",
+  time = 2019
 )
-View(variables)
+
 
 #selecting median income data in Michigan by county
 data <- getCensus(
@@ -43,12 +46,11 @@ data <- getCensus(
   region = "county:*",
   regionin = "state:26"
 )
-View(data)
+
 
 #renaming variables
 income_stats <- rename(data, household.income = SAEMHI_PT,
                        people.count = SAEPOVALL_UB90)
-View(income_stats)
 
 #adding "michigan" to county strings in order to get correct coordinates
 income_stats$NAME <- paste0(income_stats$NAME, ", Michigan")
@@ -72,7 +74,12 @@ upper_county_coordinates <- mutate_geocode(third.quartile, NAME)
 #taken from https://www.michigan.gov/mdhhs/0,5885,7-339-73971_4911_4912_6216_75529---,00.html
 clinics <- read.csv("clinics.csv")
 clinics <- select(clinics, County, Address)
-View(clinics)
+
+#counting number of clinics per county
+clinics.counts <- clinics %>%
+  group_by(County) %>%
+  mutate(count=n())
+
 
 #convert title x addresses to coordinates using google maps api
 for(i in 1:nrow(clinics)){
@@ -115,6 +122,7 @@ income_stats$NAME <- str_remove(income_stats$NAME, ", Michigan")
 #add column telling whether or not the county has a family planning clinic, where 1 = there is a clinic and 0 = no
 income_stats$repo.healthcare <- ifelse(income_stats$NAME %in% clinics$County, 1, 0)
 
+
 #chi square test between income and presence of a health facility
 income.table <- table(income_stats$repo.healthcare, income_stats$household.income)
 chisq.test(income.table, correct = F)
@@ -140,4 +148,39 @@ ggplot(income_stats, aes(x=NAME, y=household.income, color = as.factor(repo.heal
 #logistic regression
 logit <- glm(repo.healthcare ~ household.income + people.count, data = income_stats)
 summary(logit)
+
+#shiny application
+my_ui <- fluidPage(
+  #Application title
+  titlePanel("Title X Clinics in Michigan"),
+  #Dropdown menu for selecting county
+  selectInput(
+    inputId = "County",
+    label = "Select County",
+    choices = income_stats$NAME
+  ),
+  
+  #graph
+  mainPanel(
+    plotOutput("map"),
+    textOutput("message")
+  )
+)
+
+my_server <- function(input, output) {
+
+  newdata <- reactive({
+    filter(clinics, County == input$County)
+  })
+  output$map <- renderPlot({
+    mi_base +
+      geom_point(newdata(), mapping = aes(x=lon, y=lat, col = "Clinic"), inherit.aes = FALSE) +
+      coord_cartesian(xlim = c(-90,-82), ylim =c(40,48)) +
+      labs(color = "Legend", x = "Longitude", y = "Latitude")
+  })
+}
+
+shinyApp(ui = my_ui, server = my_server)
+
+
 
