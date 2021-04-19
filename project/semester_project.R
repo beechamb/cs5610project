@@ -32,10 +32,9 @@ apis <- listCensusApis()
 
 #selecting appropriate variables from the API
 variables <- listCensusMetadata(
-  name = "timeseries/poverty/saipe",
-  time = 2019
+  name = "timeseries/poverty/saipe"
+#  time = 2019
 )
-
 
 #selecting median income data in Michigan by county
 data <- getCensus(
@@ -75,6 +74,9 @@ upper_county_coordinates <- mutate_geocode(third.quartile, NAME)
 clinics <- read.csv("clinics.csv")
 clinics <- select(clinics, County, Address)
 
+#counting how many clinics there are in Michigan
+nrow(clinics)
+
 #counting number of clinics per county
 clinics.counts <- clinics %>%
   group_by(County) %>%
@@ -103,17 +105,13 @@ mi_base <- ggplot(data = mi_df, mapping = aes(x=long, y=lat, group = group)) +
   geom_polygon(color = "black", fill = NA)
 
 mi_base +
-  geom_point(data = impoverished_county_coordinates, mapping = aes(x=lon, y=lat, col = "Lower Income"), inherit.aes = FALSE) +
-  geom_point(data = notimpoverished_county_coordinates, mapping = aes(x=lon, y=lat, col = "Higher Income"), inherit.aes = FALSE) +
+  geom_point(data = lower_county_coordinates, mapping = aes(x=lon, y=lat, col = "Lower Income"), inherit.aes = FALSE) +
+  geom_point(data = upper_county_coordinates, mapping = aes(x=lon, y=lat, col = "Higher Income"), inherit.aes = FALSE) +
   geom_point(data = clinics, mapping = aes(x=lon, y=lat, col = "Clinic"), inherit.aes = FALSE) +
   coord_cartesian(xlim = c(-90,-80), ylim =c(40,50)) +
-  labs(color = "Legend", x = "Longitude", y = "Latitude")
+  labs(color = "Legend", x = "Longitude", y = "Latitude", title = "Locations of Title X Clinics, 1st Quartile Income and 
+       3rd Quartile Income in Michigan")
 
-#column telling whether or not county is below median income, where 1 = below and 0 = above
-income_stats$first.quartile <- ifelse(income_stats$household.income <= 47485, 1, 0)
-
-#column telling whether or not a county is not impoverished where 1 = not impoverished and 0 = impoverished
-income_stats$third.quartile <- ifelse(income_stats$household.income > 57626, 1, 0)
 
 #removing "michigan" from county name in income_stats in order to match with
 #clinic string locations
@@ -122,14 +120,6 @@ income_stats$NAME <- str_remove(income_stats$NAME, ", Michigan")
 #add column telling whether or not the county has a family planning clinic, where 1 = there is a clinic and 0 = no
 income_stats$repo.healthcare <- ifelse(income_stats$NAME %in% clinics$County, 1, 0)
 
-
-#chi square test between income and presence of a health facility
-income.table <- table(income_stats$repo.healthcare, income_stats$household.income)
-chisq.test(income.table, correct = F)
-
-#chi square test between number of people in poverty and presence of a health facility
-pov.table <-table(income_stats$repo.healthcare, income_stats$people.count)
-chisq.test(pov.table, correct = F)
 
 #correlation
 cor(income_stats$repo.healthcare, income_stats$household.income)
@@ -143,44 +133,17 @@ cor.test(income_stats$repo.healthcare, income_stats$household.income)
 #is a family planning clinic
 ggplot(income_stats, aes(x=NAME, y=household.income, color = as.factor(repo.healthcare))) +
   geom_point() +
-  labs(x = "County", y = "Household Income", title = "Median County Income")
+  labs(x = "County", y = "Household Income", title = "Family Planning Clinics and Median Household Income by County") + 
+  labs(color='Presence of a Clinic') +
+  scale_color_manual(labels = c("No Clinic", "Clinic"), values = c("purple", "green")) +
+  theme(axis.text.x = element_blank()) +
+  geom_hline(yintercept = 47482, color = "blue") +
+  geom_hline(yintercept = 57626, color = "red")
 
 #logistic regression
 logit <- glm(repo.healthcare ~ household.income + people.count, data = income_stats)
 summary(logit)
 
-#shiny application
-my_ui <- fluidPage(
-  #Application title
-  titlePanel("Title X Clinics in Michigan"),
-  #Dropdown menu for selecting county
-  selectInput(
-    inputId = "County",
-    label = "Select County",
-    choices = income_stats$NAME
-  ),
-  
-  #graph
-  mainPanel(
-    plotOutput("map"),
-    textOutput("message")
-  )
-)
-
-my_server <- function(input, output) {
-
-  newdata <- reactive({
-    filter(clinics, County == input$County)
-  })
-  output$map <- renderPlot({
-    mi_base +
-      geom_point(newdata(), mapping = aes(x=lon, y=lat, col = "Clinic"), inherit.aes = FALSE) +
-      coord_cartesian(xlim = c(-90,-82), ylim =c(40,48)) +
-      labs(color = "Legend", x = "Longitude", y = "Latitude")
-  })
-}
-
-shinyApp(ui = my_ui, server = my_server)
 
 
 
