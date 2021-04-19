@@ -58,15 +58,7 @@ my_server <- function(input, output) {
       labs(x = "County", y = "People in Poverty", title = "Number of People in Poverty
            of Selected County")
   })
-  #address message of selected county
-
-#  output$address <- if(nrow(newdata()) >= 1){renderText({
-#    message <- "The addresses of Title X Locations in your selected county are: "
-#    message_str <- paste0(message, input$Address)})}
-#    else{
-#      message <- "There are no clinics in your selected county"
-#    }
-#    
+  
 }
 
 shinyApp(ui = my_ui, server = my_server)
